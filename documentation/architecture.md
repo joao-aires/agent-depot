@@ -86,7 +86,7 @@ This is recoverable multi-target replacement, not a filesystem-wide atomic commi
 | All replacements finish, but cleanup is interrupted | The committed marker identifies the completed generation                | `recover` verifies and retains the new generation, then finishes cleanup                   |
 | Files or backups change after interruption          | Recorded identities cannot safely determine what to restore             | `RECOVERY_CONFLICT`; preserve current files, backups and journal for manual reconciliation |
 
-Recovery validates every journal target before modifying any target. An uncommitted generation is restored from available backups in reverse order; a committed generation is retained only if it still matches its recorded state. The writer marker can be reclaimed automatically only for a demonstrably dead process on the same host.
+Recovery validates every journal target before modifying any target. For an uncommitted replacement, recovery restores previous targets from available backups in reverse order; a committed generation is retained only if it still matches its recorded state. The writer marker can be reclaimed automatically only for a demonstrably dead process on the same host.
 
 A lost success response does not prove the old generation is still present: replacement may already have committed. Verify and inspect the resulting manifest/lock before retrying. Reapplying a plan after it changed those base records fails as stale. These mechanics are exercised with disposable Git repositories and simulated interrupted journals; they do not establish power-loss durability or protection against malicious edits to the control records. See the [recovery procedure](delivery.md#recover-an-interrupted-operation) for operator steps.
 

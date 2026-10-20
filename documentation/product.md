@@ -20,7 +20,7 @@ The first useful journey is to declare a source and an artifact with its accepte
 3. Each artifact declares its accepted commit independently, including when several artifacts share a repository. Optional tracking policies discover candidates without changing that pin. Sync restores missing snapshots from a lock; it never upgrades or rewrites a pin.
 4. Upstream changes outside selected content do not cause snapshot update churn. A plan binds its candidate commits and its starting manifest, lockfile and file state.
 5. Applying stale plans, overlapping destinations, escaping paths or updates over locally modified snapshots fails without destroying accepted content.
-6. Interrupted writes are detectable and recoverable. Recovery restores an uncommitted generation or retains a completed committed generation, and refuses to silently discard later edits.
+6. Interrupted writes are detectable and recoverable. Recovery restores the previous generation when replacement was not committed, retains a completed committed generation, and refuses to silently discard later edits.
 7. Read commands have documented mutation/network behavior. CI receives structured results and nonzero failure statuses.
 8. A packed npm artifact runs outside the source checkout. No acquired script runs during resolution, inspection, sync or update.
 
