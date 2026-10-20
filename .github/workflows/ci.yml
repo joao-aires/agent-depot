@@ -1,0 +1,50 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, node: '22' }
+          - { os: ubuntu-latest, node: '24' }
+          - { os: macos-latest, node: '24' }
+          - { os: windows-latest, node: '24' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - name: Verify committed upstream snapshots without fetching
+        run: node dist/cli.js --json verify
+      - name: Confirm checks leave tracked files unchanged
+        run: git diff --exit-code
+      - name: Build distributable package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
+        run: npm pack --ignore-scripts
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
+        with:
+          name: npm-package
+          path: agent-depot-*.tgz
+          if-no-files-found: error

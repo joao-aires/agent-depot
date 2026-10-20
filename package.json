@@ -1,0 +1,55 @@
+{
+  "name": "agent-depot",
+  "version": "0.1.0",
+  "description": "Maintain skills and agent plugins as pinned, committed repository dependencies.",
+  "type": "module",
+  "bin": {
+    "agent-depot": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "vendor",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joao-aires/agent-depot.git"
+  },
+  "homepage": "https://github.com/joao-aires/agent-depot#readme",
+  "bugs": {
+    "url": "https://github.com/joao-aires/agent-depot/issues"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",
+    "test:package": "node scripts/package-smoke.mjs",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run test:package",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "commander": "^15.0.0",
+    "minimatch": "^10.2.6",
+    "semver": "^7.8.5",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "@types/semver": "^7.8.0",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "6.0",
+    "typescript-eslint": "^8.72.0"
+  }
+}

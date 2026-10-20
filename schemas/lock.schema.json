@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "manifestHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sources": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["repository"],
+        "additionalProperties": false
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": ["skill", "plugin", "directory"]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "requireFormat": {
+            "type": "boolean"
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "track": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "branch": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["branch"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["tag"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tagPrefix": {
+                    "type": "string"
+                  },
+                  "prerelease": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["version"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "destination": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["path", "destination"],
+              "additionalProperties": false
+            },
+            "uniqueItems": true
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "mode": {
+                  "enum": ["100644", "100755"]
+                }
+              },
+              "required": ["sha256", "mode"],
+              "additionalProperties": false
+            }
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "inspection": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "minLength": 1
+              },
+              "validation": {
+                "enum": ["valid", "invalid", "unsupported", "not-requested"]
+              },
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "mcpServers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "diagnostics": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "format",
+              "validation",
+              "skills",
+              "mcpServers",
+              "extensions",
+              "diagnostics"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "source",
+          "commit",
+          "kind",
+          "path",
+          "destination",
+          "files",
+          "digest",
+          "inspection"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["schemaVersion", "manifestHash", "sources", "artifacts"],
+  "additionalProperties": false
+}
