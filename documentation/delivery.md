@@ -4,7 +4,7 @@
 
 The Verify workflow installs development dependencies from `package-lock.json` with lifecycle scripts disabled. It runs the same `npm run check` command as local development, verifies committed upstream content without fetching it, checks for tracked-file changes and builds an npm package artifact. The Secret scan workflow runs Gitleaks against the checked-out history. Validation jobs have read-only repository permissions and no npm publication credentials.
 
-Fixture integration tests use disposable local Git repositories. They establish the CLI lifecycle and controlled failure behavior; they do not establish acquired skill adherence or plugin execution in coding agents. Windows cannot verify POSIX executable flags. The packed-package smoke test installs the built tarball into an external temporary project and runs its executable through `npm exec` using npm's populated cache.
+Fixture integration tests use disposable local Git repositories. They establish the CLI lifecycle and controlled failure behavior; they do not establish acquired skill adherence or plugin execution in coding agents. Windows cannot verify POSIX executable flags. The packed-package smoke test installs the built tarball and its npm dependencies into an external temporary project, then runs its executable through offline `npm exec`. Initial tool installation may require the npm registry; snapshot verification does not.
 
 ## Scheduled upstream maintenance
 

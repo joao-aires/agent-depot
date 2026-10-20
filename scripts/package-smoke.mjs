@@ -45,7 +45,6 @@ try {
       '--ignore-scripts',
       '--no-audit',
       '--no-fund',
-      '--offline',
       resolve(temp, entry.filename),
     ],
     temp,

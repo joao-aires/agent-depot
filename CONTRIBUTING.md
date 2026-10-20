@@ -8,7 +8,7 @@ npm run check
 node dist/cli.js --json verify
 ```
 
-`npm run check` runs type checking, ESLint, Prettier, tests, compilation and a packed npm executable test. `npm test` exercises disposable Git repositories through the actual CLI and tests interrupted transaction states. The package test uses npm's populated local cache; run `npm ci` first. CI checks Node 22/24 on Linux and Node 24 on macOS/Windows.
+`npm run check` runs type checking, ESLint, Prettier, tests, compilation and a packed npm executable test. `npm test` exercises disposable Git repositories through the actual CLI and tests interrupted transaction states. The package test installs the tarball and its npm dependencies, then exercises the installed executable in npm's offline mode. CI checks Node 22/24 on Linux and Node 24 on macOS/Windows.
 
 Use an objective branch/worktree and Conventional Commits. Keep implementation, tests and affected documentation together. Explain changed behavior, checks actually performed and compatibility/recovery consequences in the PR. Do not use passing structural checks as evidence that acquired instructions behave correctly in agents.
 
