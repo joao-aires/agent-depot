@@ -25,26 +25,29 @@ After publication, the same executable will be available through `npx agent-depo
 The following commands operate on another project's declaration. Replace the manifest path with your project path. This example acquires the Agent Plugins schemas as a directory group, including their upstream license information.
 
 ```sh
-node dist/cli.js --manifest /path/to/project/skills-depot.json init
+node dist/cli.js --manifest /path/to/project/agent-depot.json init
 
-node dist/cli.js --manifest /path/to/project/skills-depot.json add plugin-schemas \
+node dist/cli.js --manifest /path/to/project/agent-depot.json add plugin-schemas \
   --repository https://github.com/agentplugins/agent-plugins-spec.git \
+  --commit ff8ab5e392cc87bd88d87c060815a87490e51003 \
   --branch main \
   --kind directory \
   --path schemas/1.0.0 \
-  --destination vendor/agent-plugins \
-  --legal LICENSE.md LICENSES/Apache-2.0.txt
+  --destination schemas/upstream/agent-plugins/1.0.0 \
+  --resource LICENSE.md=LICENSE.md LICENSES/Apache-2.0.txt=LICENSES/Apache-2.0.txt
 
-node dist/cli.js --manifest /path/to/project/skills-depot.json lock
-node dist/cli.js --manifest /path/to/project/skills-depot.json sync
-node dist/cli.js --manifest /path/to/project/skills-depot.json verify
+node dist/cli.js --manifest /path/to/project/agent-depot.json lock
+node dist/cli.js --manifest /path/to/project/agent-depot.json sync
+node dist/cli.js --manifest /path/to/project/agent-depot.json verify
 ```
 
-Commit `skills-depot.json`, `skills-depot.lock.json` and the selected snapshot directory. Ignore `.agent-depot/`, which holds disposable Git objects and local transaction state. Preserve transaction state until an interrupted operation has been recovered.
+Commit `agent-depot.json`, `agent-depot.lock.json` and the selected snapshot directory. Ignore `.agent-depot/`, which holds disposable Git objects and local transaction state. Preserve transaction state until an interrupted operation has been recovered.
 
-The destination is a **snapshot base**, not a flattened artifact root. The example produces `vendor/agent-plugins/schemas/1.0.0/` alongside `vendor/agent-plugins/LICENSE.md` and `vendor/agent-plugins/LICENSES/Apache-2.0.txt`. A skill at `skills/design` similarly remains at `<destination>/skills/design`. This preserves upstream-relative resource references. `show` reports the entry root.
+The destination contains the selected root's contents directly. This example produces `schemas/upstream/agent-plugins/1.0.0/plugin.schema.json` alongside the explicitly mapped legal files. A skill at `skills/design` with destination `plugins/frontend/skills/design` puts `SKILL.md` directly in that folder. Internal paths, bytes and executable flags are preserved.
 
-Use `--kind skill --path <skill-directory>` for a skill and `--kind plugin --path <plugin-directory>` for a complete plugin. Use `--additional <paths...>` for shared resources and `--legal <paths...>` for applicable legal files. These selections are explicit: the tool cannot discover every resource referenced by arbitrary executable code.
+Sources identify repositories. Every artifact declares its accepted `commit`, upstream `path` and local `destination`; several artifacts can reference one source at different commits. Optional `track` identifies a branch, tag or SemVer range to inspect for candidates. It never replaces the accepted pin until an explicit update is applied.
+
+Use `--kind skill` for a skill and `--kind plugin` for a complete plugin. Use `--resource source=destination` for required resources or legal files outside the selected root; destinations are relative to the artifact directory. Mappings cannot overwrite selected files. Choose mappings that retain valid references; the tool neither rewrites upstream links nor discovers arbitrary runtime dependencies.
 
 ## Review and apply updates
 

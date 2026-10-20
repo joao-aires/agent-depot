@@ -22,30 +22,44 @@ export async function snapshot(
 ): Promise<Snapshot> {
   const directory = await ensureCommit(ctx, source, commit, offline);
   const all = await tree(directory, commit);
-  const paths = [
-    artifact.path,
-    ...(artifact.additionalPaths ?? []),
-    ...(artifact.legalPaths ?? []),
+  const mappings = [
+    { path: artifact.path, destination: '.' },
+    ...(artifact.resources ?? []),
   ];
-  for (const path of paths)
-    if (!all.some((file) => under(file.path, path)))
+  const selected: (Awaited<ReturnType<typeof tree>>[number] & {
+    origin: string;
+  })[] = [];
+  for (const mapping of mappings) {
+    const matches = all.filter(
+      (file) =>
+        under(file.path, mapping.path) &&
+        (mapping !== mappings[0] ||
+          !artifact.includePaths ||
+          artifact.includePaths.some((pattern) =>
+            minimatch(file.path, pattern, { dot: true }),
+          )),
+    );
+    if (!matches.length)
       throw new DepotError(
         'MISSING_PATH',
-        `Selected upstream path is missing: ${path}`,
+        `Selected upstream path is missing or filtered out: ${mapping.path}`,
       );
-  const selected = all.filter((file) => {
-    const primary =
-      under(file.path, artifact.path) &&
-      (!artifact.includePaths ||
-        artifact.includePaths.some((pattern) =>
-          minimatch(file.path, pattern, { dot: true }),
-        ));
-    const extra = [
-      ...(artifact.additionalPaths ?? []),
-      ...(artifact.legalPaths ?? []),
-    ].some((path) => under(file.path, path));
-    return primary || extra;
-  });
+    for (const file of matches) {
+      const suffix =
+        mapping.path === '.'
+          ? file.path
+          : file.path === mapping.path
+            ? ''
+            : file.path.slice(mapping.path.length + 1);
+      const path = [
+        mapping.destination === '.' ? '' : mapping.destination,
+        suffix,
+      ]
+        .filter(Boolean)
+        .join('/');
+      selected.push({ ...file, origin: file.path, path });
+    }
+  }
   if (!selected.length)
     throw new DepotError(
       'EMPTY_SELECTION',
@@ -54,6 +68,7 @@ export async function snapshot(
   if (selected.length > 10000)
     throw new DepotError('CONTENT_LIMIT', 'Artifact exceeds 10,000 files');
   const folded = new Map<string, string>();
+  const fileNames = new Set<string>();
   for (const entry of selected) {
     safePath(entry.path);
     if (entry.path.split('/').some((part) => part.toLowerCase() === '.git'))
@@ -61,6 +76,12 @@ export async function snapshot(
         'UNSAFE_PATH',
         'Git control paths cannot be acquired',
       );
+    if (fileNames.has(entry.path.toLowerCase()))
+      throw new DepotError(
+        'PATH_COLLISION',
+        `Multiple upstream files map to ${entry.path}`,
+      );
+    fileNames.add(entry.path.toLowerCase());
     const parts = entry.path.split('/');
     for (let length = 1; length <= parts.length; length++) {
       const original = parts.slice(0, length).join('/');
@@ -78,6 +99,16 @@ export async function snapshot(
         `Symlink, submodule or unsupported entry: ${entry.path}`,
       );
   }
+  for (const name of fileNames)
+    if (
+      [...fileNames].some(
+        (other) => other !== name && other.startsWith(`${name}/`),
+      )
+    )
+      throw new DepotError(
+        'PATH_COLLISION',
+        `File/directory mapping conflict: ${name}`,
+      );
   const contents = await blobs(directory, selected);
   const files: Snapshot['files'] = new Map();
   const identities: Record<string, FileIdentity> = Object.create(
@@ -104,8 +135,7 @@ export async function snapshot(
     identities[entry.path] = { sha256: hash(content), mode };
   });
   if (artifact.kind === 'skill') {
-    const entry =
-      artifact.path === '.' ? 'SKILL.md' : `${artifact.path}/SKILL.md`;
+    const entry = 'SKILL.md';
     if (!files.has(entry))
       throw new DepotError('MISSING_SKILL', `Selected skill has no ${entry}`);
   }

@@ -12,7 +12,7 @@ test('recovery restores an interrupted generation and removes a dead writer mark
   f.acquire();
   const base = join(f.project, '.agent-depot/transaction');
   await mkdir(join(base, 'backup'), { recursive: true });
-  const target = join(f.project, 'vendor/toolkit');
+  const target = join(f.project, 'plugins/example/skills/alpha');
   const before = objectHash(await walk(target));
   await rename(target, join(base, 'backup/0'));
   await mkdir(target);
@@ -22,7 +22,7 @@ test('recovery restores an interrupted generation and removes a dead writer mark
     join(base, 'journal.json'),
     json({
       schemaVersion: 1,
-      entries: [{ target: 'vendor/toolkit', before, after }],
+      entries: [{ target: 'plugins/example/skills/alpha', before, after }],
     }),
   );
   // Find a non-live PID without assuming a particular PID allocation policy.
@@ -43,7 +43,7 @@ test('recovery restores an interrupted generation and removes a dead writer mark
   f.ok('recover');
   f.ok('verify');
   assert.match(
-    await readFile(join(target, 'skills/alpha/SKILL.md'), 'utf8'),
+    await readFile(join(target, 'SKILL.md'), 'utf8'),
     /name: alpha/u,
   );
 });
@@ -53,7 +53,7 @@ test('recovery protects edits made after interruption before changing any entry'
   f.acquire();
   const base = join(f.project, '.agent-depot/transaction');
   await mkdir(join(base, 'backup'), { recursive: true });
-  const target = join(f.project, 'vendor/toolkit');
+  const target = join(f.project, 'plugins/example/skills/alpha');
   const before = objectHash(await walk(target));
   await rename(target, join(base, 'backup/0'));
   await mkdir(target);
@@ -63,7 +63,7 @@ test('recovery protects edits made after interruption before changing any entry'
     join(base, 'journal.json'),
     json({
       schemaVersion: 1,
-      entries: [{ target: 'vendor/toolkit', before, after }],
+      entries: [{ target: 'plugins/example/skills/alpha', before, after }],
     }),
   );
   await writeFile(join(target, 'new.txt'), 'post-crash user edit\n');
@@ -77,7 +77,7 @@ test('recovery protects edits made after interruption before changing any entry'
 
 test('a live writer prevents another mutator from starting', async (t) => {
   const f = fixture(t);
-  const ctx = context(join(f.project, 'skills-depot.json'));
+  const ctx = context(join(f.project, 'agent-depot.json'));
   await withWriter(ctx, async () => {
     assert.match(f.cli('lock').stderr, /BUSY/u);
   });
@@ -86,7 +86,7 @@ test('a live writer prevents another mutator from starting', async (t) => {
 test('a staged replacement failure leaves accepted data unchanged and releases the writer', async (t) => {
   const f = fixture(t);
   f.acquire();
-  const ctx = context(join(f.project, 'skills-depot.json'));
+  const ctx = context(join(f.project, 'agent-depot.json'));
   const old = await readFile(ctx.lockPath);
   await assert.rejects(
     withWriter(ctx, () =>
@@ -106,12 +106,20 @@ test('committed generations are retained when cleanup is interrupted', async (t)
   f.acquire();
   const base = join(f.project, '.agent-depot/transaction');
   await mkdir(base, { recursive: true });
-  const after = objectHash(await walk(join(f.project, 'vendor/toolkit')));
+  const after = objectHash(
+    await walk(join(f.project, 'plugins/example/skills/alpha')),
+  );
   await writeFile(
     join(base, 'journal.json'),
     json({
       schemaVersion: 1,
-      entries: [{ target: 'vendor/toolkit', before: '0'.repeat(64), after }],
+      entries: [
+        {
+          target: 'plugins/example/skills/alpha',
+          before: '0'.repeat(64),
+          after,
+        },
+      ],
     }),
   );
   await writeFile(join(base, 'committed'), 'committed\n');
@@ -122,13 +130,16 @@ test('committed generations are retained when cleanup is interrupted', async (t)
 test('overlapping replacement targets fail before leaving recovery state', async (t) => {
   const f = fixture(t);
   f.acquire();
-  const ctx = context(join(f.project, 'skills-depot.json'));
+  const ctx = context(join(f.project, 'agent-depot.json'));
   await assert.rejects(
     withWriter(ctx, () =>
       replace(ctx, [
-        { target: join(f.project, 'vendor/toolkit'), remove: true },
         {
-          target: join(f.project, 'vendor/toolkit/nested'),
+          target: join(f.project, 'plugins/example/skills/alpha'),
+          remove: true,
+        },
+        {
+          target: join(f.project, 'plugins/example/skills/alpha/nested'),
           content: 'replacement',
         },
       ]),

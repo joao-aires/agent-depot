@@ -4,17 +4,19 @@ The CLI is a local dependency maintenance process with Git as its source transpo
 
 ## Ownership and durable records
 
-`skills-depot.json` declares sources and artifacts. `skills-depot.lock.json` records accepted resolution and content identity. Both paths are relative to the manifest directory, which is the project root even when the command is called elsewhere. Repository-specific packaging metadata may live under the manifest's `metadata` field; the core does not interpret it.
+`agent-depot.json` declares sources and artifacts. `agent-depot.lock.json` records accepted resolution and content identity. Both paths are relative to the manifest directory, which is the project root even when the command is called elsewhere. Repository-specific packaging metadata may live under the manifest's `metadata` field; the core does not interpret it.
 
-Each artifact owns a separate destination directory. Within it, files retain paths relative to the upstream repository: artifact `path: "skills/design"` at destination `vendor/design` produces `vendor/design/skills/design/SKILL.md`. Its entry root is reported explicitly. `additionalPaths` selects shared resource trees at their original paths; `legalPaths` selects legal files. A directory group rooted at `.` can use `includePaths` for a coherent subset. Complete plugin snapshots cannot use filtering to masquerade as complete packages.
+Sources describe repository identity once. Artifacts independently declare accepted commits and optional tracking policies. Shared repositories reuse the same Git cache; this does not couple artifact revisions or update policies.
+
+Each artifact owns a separate destination directory. The contents of upstream `path: "skills/design"` materialize directly at destination `plugins/frontend/skills/design`, including its `SKILL.md` and internal resource hierarchy. Explicit `resources` mappings place selected external files or directories within that owned destination, rejecting duplicate targets and file/directory or case collisions. Complete plugin snapshots cannot filter their primary package contents. A directory group may use `includePaths` for an intentional subset.
 
 The lockfile includes per-file SHA-256 and executable mode as well as an aggregate digest. It records only metadata needed to reproduce or verify content; timestamps are excluded. Source commit IDs provide provenance, not a claim of authenticity. Local hashes establish agreement with the reviewed lockfile, not trustworthiness.
 
 ## Modules and operations
 
-Configuration validation establishes typed input from unknown JSON. Git acquisition resolves references and reads committed objects without checking out or executing upstream filters. Snapshot selection preserves source paths; inventory adds skill and plugin diagnostics. Planning binds exact candidates and the accepted generation. The transaction layer owns local replacement and recovery. The CLI presents these operations as text or versioned JSON.
+Configuration validation establishes typed input from unknown JSON. Git acquisition resolves references and reads committed objects without checking out or executing upstream filters. Snapshot selection preserves paths within each selected root and records explicit external mappings; inventory adds skill and plugin diagnostics. Planning binds exact candidates and the accepted generation. Unchanged accepted snapshots are reused after integrity checks, so a targeted update does not require unrelated upstreams to be reachable. The transaction layer owns local replacement and recovery. The CLI presents these operations as text or versioned JSON.
 
-The main sequence is `declaration → lock → sync → verify`. Updates use `outdated → plan → diff → update --plan`. Lock resolution preserves valid existing commits unless a declaration changes. Update discovery may fetch candidates; inspection of accepted snapshots and verification are offline. Missing content can be restored from locked Git objects when upstream access or cache is available. Committed snapshots remain usable if those objects become unavailable.
+The main sequence is `declaration → lock → sync → verify`. Updates use `outdated → plan → diff → update --plan`. Locking acquires the artifact commits already declared; it does not discover newer revisions. Update discovery follows optional per-artifact tracking policies and may fetch candidates; inspection of accepted snapshots and verification are offline. Missing content can be restored from locked Git objects when upstream access or cache is available. Committed snapshots remain usable if those objects become unavailable.
 
 ## Failure and authority boundaries
 

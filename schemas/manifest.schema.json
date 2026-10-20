@@ -7,7 +7,7 @@
       "minLength": 1
     },
     "schemaVersion": {
-      "const": 1
+      "const": 2
     },
     "sources": {
       "type": "object",
@@ -21,20 +21,54 @@
           "repository": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "required": ["repository"],
+        "additionalProperties": false
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
           },
-          "select": {
+          "kind": {
+            "enum": ["skill", "plugin", "directory"]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "requireFormat": {
+            "type": "boolean"
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "track": {
             "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "commit": {
-                    "type": "string",
-                    "pattern": "^[a-f0-9]{40}$"
-                  }
-                },
-                "required": ["commit"],
-                "additionalProperties": false
-              },
               {
                 "type": "object",
                 "properties": {
@@ -75,66 +109,28 @@
                 "additionalProperties": false
               }
             ]
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "destination": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["path", "destination"],
+              "additionalProperties": false
+            },
+            "uniqueItems": true
           }
         },
-        "required": ["repository", "select"],
-        "additionalProperties": false
-      }
-    },
-    "artifacts": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string",
-        "pattern": "^[a-z0-9][a-z0-9._-]*$"
-      },
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "enum": ["skill", "plugin", "directory"]
-          },
-          "path": {
-            "type": "string",
-            "minLength": 1
-          },
-          "destination": {
-            "type": "string",
-            "minLength": 1
-          },
-          "additionalPaths": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
-            "uniqueItems": true
-          },
-          "includePaths": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
-            "minItems": 1,
-            "uniqueItems": true
-          },
-          "legalPaths": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
-            "uniqueItems": true
-          },
-          "requireFormat": {
-            "type": "boolean"
-          }
-        },
-        "required": ["source", "kind", "path", "destination"],
+        "required": ["source", "commit", "kind", "path", "destination"],
         "additionalProperties": false
       }
     },

@@ -17,7 +17,7 @@ writeFileSync(
   join(temp, 'agent-depot-discovery.json'),
   JSON.stringify(discovery, null, 2),
 );
-const relevant = discovery.result.sources.some(
+const relevant = discovery.result.artifacts.some(
   (source) => source.status === 'update-available',
 );
 if (relevant) {

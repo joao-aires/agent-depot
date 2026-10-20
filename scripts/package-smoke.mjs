@@ -57,12 +57,12 @@ try {
   );
   assert.equal(
     realpathSync(report.result.created),
-    realpathSync(join(temp, 'skills-depot.json')),
+    realpathSync(join(temp, 'agent-depot.json')),
   );
   const declaration = JSON.parse(
-    readFileSync(join(temp, 'skills-depot.json'), 'utf8'),
+    readFileSync(join(temp, 'agent-depot.json'), 'utf8'),
   );
-  assert.equal(declaration.schemaVersion, 1);
+  assert.equal(declaration.schemaVersion, 2);
   const help = run(
     ['exec', '--offline', '--no', '--', 'agent-depot', '--help'],
     temp,

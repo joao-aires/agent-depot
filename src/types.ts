@@ -6,23 +6,23 @@ export type Selector =
 
 export interface Source {
   repository: string;
-  select: Selector;
 }
 
 export interface Artifact {
   source: string;
+  commit: string;
+  track?: Exclude<Selector, { commit: string }>;
   kind: 'skill' | 'plugin' | 'directory';
   path: string;
   destination: string;
-  additionalPaths?: string[];
+  resources?: { path: string; destination: string }[];
   includePaths?: string[];
-  legalPaths?: string[];
   requireFormat?: boolean;
 }
 
 export interface Manifest {
   $schema?: string;
-  schemaVersion: 1;
+  schemaVersion: 2;
   sources: Record<string, Source>;
   artifacts: Record<string, Artifact>;
   metadata?: Record<string, unknown>;
@@ -42,10 +42,6 @@ export interface Inspection {
   diagnostics: string[];
 }
 
-export interface LockedSource extends Source {
-  commit: string;
-}
-
 export interface LockedArtifact extends Artifact {
   files: Record<string, FileIdentity>;
   digest: string;
@@ -53,9 +49,9 @@ export interface LockedArtifact extends Artifact {
 }
 
 export interface Lock {
-  schemaVersion: 1;
+  schemaVersion: 2;
   manifestHash: string;
-  sources: Record<string, LockedSource>;
+  sources: Record<string, Source>;
   artifacts: Record<string, LockedArtifact>;
 }
 
@@ -65,7 +61,7 @@ export interface Snapshot {
 }
 
 export interface UpdatePlan {
-  schemaVersion: 1;
+  schemaVersion: 2;
   baseManifestHash: string;
   baseLockHash: string;
   manifest: Manifest;

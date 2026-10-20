@@ -21,7 +21,7 @@ import {
 import { loadPlan } from './config.js';
 import { context, json, packageFile } from './util.js';
 import { DepotError } from './types.js';
-import type { Artifact, Selector } from './types.js';
+import type { Artifact } from './types.js';
 
 const pkg = JSON.parse(await readFile(packageFile('package.json'), 'utf8')) as {
   version: string;
@@ -35,7 +35,7 @@ const program = new Command()
   .option(
     '-m, --manifest <file>',
     'declaration file; paths are relative to its directory',
-    'skills-depot.json',
+    'agent-depot.json',
   )
   .option('--json', 'emit a versioned JSON report')
   .exitOverride()
@@ -103,9 +103,10 @@ program
   .description(
     'Discover relevant upstream changes without changing accepted files',
   )
-  .option('--source <id>', 'inspect one source')
+  .option('--source <id>', 'inspect artifacts from one repository')
+  .option('--artifact <id>', 'inspect one artifact')
   .action(
-    action('outdated', (options: { source?: string }) =>
+    action('outdated', (options: { source?: string; artifact?: string }) =>
       outdated(ctx(), options),
     ),
   );
@@ -116,11 +117,15 @@ program
   )
   .option(
     '--source <id>',
-    'upgrade only this source; declaration edits still apply',
+    'check tracking policies for artifacts from this repository; declaration edits still apply',
+  )
+  .option(
+    '--artifact <id>',
+    'update one artifact; declaration edits still apply',
   )
   .option(
     '--to <commit>',
-    'explicitly replace this source selector with a full commit pin',
+    'set --artifact to this full commit; preserve its optional tracking policy',
   )
   .requiredOption(
     '-o, --output <file>',
@@ -129,7 +134,12 @@ program
   .action(
     action(
       'plan',
-      async (options: { source?: string; to?: string; output: string }) => {
+      async (options: {
+        source?: string;
+        artifact?: string;
+        to?: string;
+        output: string;
+      }) => {
         const value = await plan(ctx(), options);
         await writePlan(resolve(options.output), value);
         return {
@@ -193,18 +203,18 @@ program
   .requiredOption('--path <path>', 'upstream-relative artifact root')
   .requiredOption(
     '--destination <path>',
-    'repository-relative snapshot base; retains upstream paths',
+    'repository-relative destination for the selected root contents',
   )
   .option('--kind <kind>', 'skill, plugin or directory', 'skill')
-  .option('--commit <sha>', 'full immutable commit')
+  .requiredOption('--commit <sha>', 'full accepted immutable commit')
+  .option('--source <id>', 'shared repository ID; defaults to the artifact ID')
   .option('--branch <name>', 'branch to track')
   .option('--tag <name>', 'exact tag')
   .option('--version-range <range>', 'SemVer tag constraint')
   .option('--tag-prefix <prefix>', 'SemVer tag prefix', 'v')
-  .option('--legal <paths...>', 'required legal files from the repository root')
   .option(
-    '--additional <paths...>',
-    'required shared paths, preserving upstream layout',
+    '--resource <mappings...>',
+    'additional source=destination paths within this artifact',
   )
   .option(
     '--require-format',
@@ -220,52 +230,55 @@ program
           path: string;
           destination: string;
           kind: Artifact['kind'];
-          commit?: string;
+          commit: string;
+          source?: string;
           branch?: string;
           tag?: string;
           versionRange?: string;
           tagPrefix: string;
-          legal?: string[];
-          additional?: string[];
+          resource?: string[];
           requireFormat?: boolean;
         },
       ) => {
         const selectors = [
-          options.commit,
           options.branch,
           options.tag,
           options.versionRange,
         ].filter((value) => value !== undefined);
-        if (selectors.length !== 1)
+        if (selectors.length > 1)
           throw new DepotError(
             'SELECTOR_REQUIRED',
-            'Choose exactly one of --commit, --branch, --tag or --version-range',
+            'Choose at most one tracking policy: --branch, --tag or --version-range',
           );
-        const select: Selector = options.commit
-          ? { commit: options.commit }
-          : options.branch
-            ? { branch: options.branch }
-            : options.tag
-              ? { tag: options.tag }
-              : {
-                  version: options.versionRange!,
-                  tagPrefix: options.tagPrefix,
-                };
         const artifact: Artifact = {
-          source: id,
+          source: options.source ?? id,
+          commit: options.commit,
           kind: options.kind,
           path: options.path,
           destination: options.destination,
         };
-        if (options.legal) artifact.legalPaths = options.legal;
-        if (options.additional) artifact.additionalPaths = options.additional;
+        if (options.branch) artifact.track = { branch: options.branch };
+        if (options.tag) artifact.track = { tag: options.tag };
+        if (options.versionRange)
+          artifact.track = {
+            version: options.versionRange,
+            tagPrefix: options.tagPrefix,
+          };
+        if (options.resource)
+          artifact.resources = options.resource.map((mapping) => {
+            const split = mapping.indexOf('=');
+            if (split <= 0 || split === mapping.length - 1)
+              throw new DepotError(
+                'INVALID_MAPPING',
+                'Expected --resource source=destination',
+              );
+            return {
+              path: mapping.slice(0, split),
+              destination: mapping.slice(split + 1),
+            };
+          });
         if (options.requireFormat) artifact.requireFormat = true;
-        return add(
-          ctx(),
-          id,
-          { repository: options.repository, select },
-          artifact,
-        );
+        return add(ctx(), id, { repository: options.repository }, artifact);
       },
     ),
   );

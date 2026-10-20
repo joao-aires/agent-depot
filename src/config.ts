@@ -38,25 +38,6 @@ export function checkManifest(manifest: Manifest): void {
       /[\x00-\x1f]/u.test(source.repository)
     )
       throw new DepotError('INVALID_SOURCE', `Invalid repository for ${id}`);
-    const selector = source.select;
-    const ref =
-      'commit' in selector
-        ? selector.commit
-        : 'branch' in selector
-          ? selector.branch
-          : 'tag' in selector
-            ? selector.tag
-            : '';
-    if (
-      ref &&
-      (ref.startsWith('-') ||
-        /[\s~^:?*[\\\x00-\x1f]/u.test(ref) ||
-        ref.includes('..') ||
-        ref.includes('@{'))
-    )
-      throw new DepotError('INVALID_REF', `Invalid Git reference for ${id}`);
-    if ('version' in selector && !validRange(selector.version))
-      throw new DepotError('INVALID_VERSION', `Invalid SemVer range for ${id}`);
   }
   const destinations: string[] = [];
   for (const [id, artifact] of Object.entries(manifest.artifacts)) {
@@ -65,6 +46,28 @@ export function checkManifest(manifest: Manifest): void {
         'UNKNOWN_SOURCE',
         `${id} references unknown source ${artifact.source}`,
       );
+    const selector = artifact.track;
+    if (selector) {
+      const ref =
+        'branch' in selector
+          ? selector.branch
+          : 'tag' in selector
+            ? selector.tag
+            : '';
+      if (
+        ref &&
+        (ref.startsWith('-') ||
+          /[\s~^:?*[\\\x00-\x1f]/u.test(ref) ||
+          ref.includes('..') ||
+          ref.includes('@{'))
+      )
+        throw new DepotError('INVALID_REF', `Invalid Git reference for ${id}`);
+      if ('version' in selector && !validRange(selector.version))
+        throw new DepotError(
+          'INVALID_VERSION',
+          `Invalid SemVer range for ${id}`,
+        );
+    }
     safePath(artifact.path, true);
     safePath(artifact.destination);
     const first = artifact.destination.split('/')[0]!.toLowerCase();
@@ -72,16 +75,18 @@ export function checkManifest(manifest: Manifest): void {
       [
         '.git',
         '.agent-depot',
-        'skills-depot.json',
-        'skills-depot.lock.json',
+        'agent-depot.json',
+        'agent-depot.lock.json',
       ].includes(first)
     )
       throw new DepotError(
         'RESERVED_PATH',
         `Reserved destination: ${artifact.destination}`,
       );
-    for (const path of artifact.additionalPaths ?? []) safePath(path, true);
-    for (const path of artifact.legalPaths ?? []) safePath(path);
+    for (const resource of artifact.resources ?? []) {
+      safePath(resource.path, true);
+      safePath(resource.destination, true);
+    }
     if (artifact.kind === 'plugin' && artifact.includePaths)
       throw new DepotError(
         'INCOMPLETE_PLUGIN',
@@ -117,10 +122,26 @@ export function checkManifest(manifest: Manifest): void {
 
 export async function loadManifest(ctx: Context): Promise<Manifest> {
   await noLinks(ctx.root, ctx.manifestPath);
-  const manifest = await validate<Manifest>(
-    'manifest',
-    await readJson(ctx.manifestPath),
-  );
+  if (
+    !(await exists(ctx.manifestPath)) &&
+    (await exists(ctx.root + '/skills-depot.json'))
+  )
+    throw new DepotError(
+      'MIGRATION_REQUIRED',
+      'Legacy skills-depot.json found; migrate to agent-depot.json schemaVersion 2. See configuration documentation.',
+    );
+  const value = await readJson(ctx.manifestPath);
+  if (
+    value &&
+    typeof value === 'object' &&
+    'schemaVersion' in value &&
+    value.schemaVersion === 1
+  )
+    throw new DepotError(
+      'MIGRATION_REQUIRED',
+      'Schema version 1 uses different commit ownership and snapshot layout; migrate explicitly to version 2.',
+    );
+  const manifest = await validate<Manifest>('manifest', value);
   checkManifest(manifest);
   return manifest;
 }
@@ -130,7 +151,7 @@ export async function loadLock(ctx: Context): Promise<Lock | null> {
   if (!(await exists(ctx.lockPath))) return null;
   const lock = await validate<Lock>('lock', await readJson(ctx.lockPath));
   checkManifest({
-    schemaVersion: 1,
+    schemaVersion: 2,
     sources: lock.sources,
     artifacts: lock.artifacts,
   });
@@ -182,16 +203,11 @@ export function assertAligned(
     );
   for (const [id, source] of Object.entries(manifest.sources)) {
     const locked = lock.sources[id]!;
-    if (
-      source.repository !== locked.repository ||
-      objectHash(source.select) !== objectHash(locked.select)
-    )
+    if (source.repository !== locked.repository)
       throw new DepotError(
         'INVALID_LOCK',
         `Source declaration mismatch: ${id}`,
       );
-    if ('commit' in source.select && source.select.commit !== locked.commit)
-      throw new DepotError('INVALID_LOCK', `Commit selector mismatch: ${id}`);
   }
   for (const [id, artifact] of Object.entries(manifest.artifacts)) {
     const {

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { maxSatisfying, valid } from 'semver';
-import type { Context, Source } from './types.js';
+import type { Context, Source, Selector } from './types.js';
 import { DepotError } from './types.js';
 import { exists, hash, noLinks, order } from './util.js';
 
@@ -133,8 +133,8 @@ async function fetch(
 export async function resolveSource(
   ctx: Context,
   source: Source,
+  selector: Selector,
 ): Promise<string> {
-  const selector = source.select;
   let ref: string;
   if ('commit' in selector) ref = selector.commit;
   else if ('branch' in selector) ref = `refs/heads/${selector.branch}`;

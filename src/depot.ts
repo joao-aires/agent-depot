@@ -30,6 +30,7 @@ import type {
   ArtifactChange,
   Context,
   Lock,
+  LockedArtifact,
   Manifest,
   Snapshot,
   UpdatePlan,
@@ -47,6 +48,7 @@ import {
 export interface Options {
   offline?: boolean;
   source?: string;
+  artifact?: string;
   to?: string;
 }
 
@@ -144,10 +146,7 @@ export async function inventory(ctx: Context, id?: string): Promise<unknown> {
           ([key]) =>
             !id || key === id || manifest.artifacts[id]?.source === key,
         )
-        .map(([key, source]) => [
-          key,
-          { ...source, commit: lock?.sources[key]?.commit ?? null },
-        ]),
+        .map(([key, source]) => [key, source]),
     ),
     artifacts: Object.fromEntries(
       Object.entries(manifest.artifacts)
@@ -158,10 +157,7 @@ export async function inventory(ctx: Context, id?: string): Promise<unknown> {
           key,
           {
             ...artifact,
-            entryRoot:
-              artifact.path === '.'
-                ? artifact.destination
-                : `${artifact.destination}/${artifact.path}`,
+            entryRoot: artifact.destination,
             inspection: lock?.artifacts[key]?.inspection ?? null,
           },
         ]),
@@ -195,66 +191,81 @@ export async function status(ctx: Context): Promise<unknown> {
   };
 }
 
+function declaration(artifact: LockedArtifact) {
+  const {
+    files: _files,
+    digest: _digest,
+    inspection: _inspection,
+    ...value
+  } = artifact;
+  return value;
+}
+
 async function buildLock(
   ctx: Context,
   manifest: Manifest,
   previous: Lock | null,
-  upgrade: boolean,
   options: Options,
 ): Promise<{ lock: Lock; snapshots: Map<string, Snapshot> }> {
   await safeDestinations(ctx, manifest);
   if (options.source && !Object.hasOwn(manifest.sources, options.source))
     throw new DepotError('UNKNOWN_SOURCE', `Unknown source: ${options.source}`);
   const lock: Lock = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     manifestHash: objectHash(manifest),
     sources: {},
     artifacts: {},
   };
-  for (const [id, source] of Object.entries(manifest.sources)) {
-    const old = previous?.sources[id];
-    const same =
-      !!old &&
-      objectHash({ repository: old.repository, select: old.select }) ===
-        objectHash(source);
-    const selected = upgrade && (!options.source || options.source === id);
-    const commit =
-      same && !selected ? old.commit : await resolveSource(ctx, source);
-    lock.sources[id] = { ...source, commit };
-  }
+  lock.sources = structuredClone(manifest.sources);
   const snapshots = new Map<string, Snapshot>();
   for (const [id, artifact] of Object.entries(manifest.artifacts)) {
-    const source = lock.sources[artifact.source]!;
-    const result = await snapshot(
-      ctx,
-      artifact,
-      source,
-      source.commit,
-      options.offline,
-    );
-    snapshots.set(id, result);
-    lock.artifacts[id] = result.locked;
-  }
-  // Do not churn accepted commits for unrelated upstream changes under an unchanged policy.
-  for (const [id, source] of Object.entries(lock.sources)) {
-    const old = previous?.sources[id];
-    const artifacts = Object.entries(lock.artifacts).filter(
-      ([, artifact]) => artifact.source === id,
-    );
+    const source = manifest.sources[artifact.source]!;
+    const old = previous?.artifacts[id];
+    let result: Snapshot;
     if (
       old &&
-      artifacts.length &&
-      objectHash({ repository: old.repository, select: old.select }) ===
-        objectHash({ repository: source.repository, select: source.select }) &&
-      artifacts.every(
-        ([key, artifact]) =>
-          previous?.artifacts[key]?.digest === artifact.digest,
-      ) &&
-      Object.entries(previous!.artifacts).filter(
-        ([, artifact]) => artifact.source === id,
-      ).length === artifacts.length
-    )
-      source.commit = old.commit;
+      source.repository === previous?.sources[old.source]?.repository &&
+      objectHash(declaration(old)) === objectHash(artifact) &&
+      (await exists(join(ctx.root, artifact.destination)))
+    ) {
+      const destination = join(ctx.root, artifact.destination);
+      if (!compareFiles(await walk(destination), old.files))
+        throw new DepotError(
+          'LOCAL_CHANGED',
+          `Snapshot differs from the lock: ${id}`,
+        );
+      const files: Snapshot['files'] = new Map();
+      for (const [path, identity] of Object.entries(old.files))
+        files.set(path, {
+          content: await readFile(join(destination, path)),
+          mode: identity.mode,
+        });
+      const inspection = await inspect(artifact, files);
+      if (artifact.requireFormat && inspection.validation !== 'valid')
+        throw new DepotError(
+          'FORMAT_REQUIRED',
+          `Format validation failed: ${id}`,
+        );
+      result = {
+        files,
+        locked: {
+          ...artifact,
+          files: old.files,
+          digest: old.digest,
+          inspection,
+        },
+      };
+    } else {
+      result = await snapshot(
+        ctx,
+        artifact,
+        source,
+        artifact.commit,
+        options.offline,
+      );
+    }
+    snapshots.set(id, result);
+    lock.artifacts[id] = result.locked;
   }
   return { lock, snapshots };
 }
@@ -268,7 +279,7 @@ export async function lockSources(
     const old = await loadLock(ctx);
     if (old && old.manifestHash === objectHash(manifest))
       return { changed: false, sources: Object.keys(old.sources).length };
-    const result = await buildLock(ctx, manifest, old, false, options);
+    const result = await buildLock(ctx, manifest, old, options);
     if (old && objectHash(old) !== objectHash(result.lock)) {
       for (const artifact of Object.values(old.artifacts))
         if (await exists(join(ctx.root, artifact.destination)))
@@ -301,7 +312,7 @@ export async function sync(ctx: Context, options: Options): Promise<unknown> {
         ctx,
         manifest.artifacts[id]!,
         source,
-        source.commit,
+        artifact.commit,
         options.offline,
       );
       if (result.locked.digest !== artifact.digest)
@@ -340,8 +351,8 @@ function changes(old: Lock, next: Lock): ArtifactChange[] {
         Object.hasOwn(oldFiles, path) &&
         objectHash(oldFiles[path]) !== objectHash(newFiles[path]),
     );
-    const oldCommit = before ? old.sources[before.source]!.commit : null;
-    const newCommit = after ? next.sources[after.source]!.commit : oldCommit!;
+    const oldCommit = before?.commit ?? null;
+    const newCommit = after?.commit ?? oldCommit!;
     if (
       added.length ||
       removed.length ||
@@ -375,23 +386,58 @@ export async function makePlan(
     );
   await verifySnapshots(ctx, old);
   const manifest = structuredClone(current);
-  if (options.to) {
-    if (!options.source || !/^[a-f0-9]{40}$/u.test(options.to))
-      throw new DepotError(
-        'INVALID_TARGET',
-        '--to requires --source and a full commit SHA',
-      );
-    if (!Object.hasOwn(manifest.sources, options.source))
-      throw new DepotError(
-        'UNKNOWN_SOURCE',
-        `Unknown source: ${options.source}`,
-      );
-    manifest.sources[options.source]!.select = { commit: options.to };
+  selectedArtifacts(manifest, options);
+  if (options.to && (!options.artifact || !/^[a-f0-9]{40}$/u.test(options.to)))
+    throw new DepotError(
+      'INVALID_TARGET',
+      '--to requires --artifact and a full commit SHA',
+    );
+  const tracked = new Set<string>();
+  const resolutions = new Map<string, Promise<string>>();
+  for (const [id, artifact] of selectedArtifacts(manifest, options)) {
+    if (options.to) artifact.commit = options.to;
+    else if (
+      artifact.track &&
+      old.artifacts[id] &&
+      objectHash(declaration(old.artifacts[id]!)) === objectHash(artifact) &&
+      old.sources[artifact.source]?.repository ===
+        manifest.sources[artifact.source]!.repository
+    ) {
+      const source = manifest.sources[artifact.source]!;
+      const key = objectHash({ source, track: artifact.track });
+      if (!resolutions.has(key))
+        resolutions.set(key, resolveSource(ctx, source, artifact.track));
+      artifact.commit = await resolutions.get(key)!;
+      tracked.add(id);
+    }
   }
   checkManifest(manifest);
-  const candidate = await buildLock(ctx, manifest, old, true, options);
+  const candidate = await buildLock(ctx, manifest, old, options);
+  // Tracking unrelated upstream changes must not rewrite accepted pins. Explicit --to and manifest edits remain intentional changes.
+  for (const id of tracked) {
+    const before = old.artifacts[id];
+    const accepted = current.artifacts[id]!;
+    const after = candidate.lock.artifacts[id]!;
+    const {
+      files: _files,
+      digest: _digest,
+      inspection: _inspection,
+      ...declaration
+    } = before ?? {};
+    if (
+      before &&
+      objectHash(declaration) === objectHash(accepted) &&
+      before.digest === after.digest &&
+      old.sources[before.source]?.repository ===
+        manifest.sources[after.source]?.repository
+    ) {
+      manifest.artifacts[id]!.commit = before.commit;
+      after.commit = before.commit;
+    }
+  }
+  candidate.lock.manifestHash = objectHash(manifest);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     baseManifestHash: objectHash(current),
     baseLockHash: objectHash(old),
     manifest,
@@ -421,13 +467,7 @@ export async function applyPlan(ctx: Context, file: string): Promise<unknown> {
     await verifySnapshots(ctx, old);
     assertAligned(candidate.manifest, candidate.lock);
     await safeDestinations(ctx, candidate.manifest);
-    const result = await buildLock(
-      ctx,
-      candidate.manifest,
-      candidate.lock,
-      false,
-      {},
-    );
+    const result = await buildLock(ctx, candidate.manifest, old, {});
     if (objectHash(result.lock) !== objectHash(candidate.lock))
       throw new DepotError(
         'INVALID_PLAN',
@@ -479,6 +519,23 @@ export async function applyPlan(ctx: Context, file: string): Promise<unknown> {
   });
 }
 
+function selectedArtifacts(manifest: Manifest, options: Options) {
+  if (options.source && options.artifact)
+    throw new DepotError(
+      'INVALID_TARGET',
+      'Choose --source or --artifact, not both',
+    );
+  if (options.source && !Object.hasOwn(manifest.sources, options.source))
+    throw new DepotError('UNKNOWN_SOURCE', `Unknown source: ${options.source}`);
+  if (options.artifact && !Object.hasOwn(manifest.artifacts, options.artifact))
+    throw new DepotError('NOT_FOUND', `Unknown artifact: ${options.artifact}`);
+  return Object.entries(manifest.artifacts).filter(
+    ([id, artifact]) =>
+      (!options.source || artifact.source === options.source) &&
+      (!options.artifact || id === options.artifact),
+  );
+}
+
 export async function outdated(
   ctx: Context,
   options: Options,
@@ -487,50 +544,50 @@ export async function outdated(
     const manifest = await loadManifest(ctx);
     const old = await loadLock(ctx);
     assertAligned(manifest, old);
-    if (options.source && !Object.hasOwn(manifest.sources, options.source))
-      throw new DepotError(
-        'UNKNOWN_SOURCE',
-        `Unknown source: ${options.source}`,
-      );
-    const sources = [];
-    for (const [id, source] of Object.entries(manifest.sources)) {
-      if (options.source && options.source !== id) continue;
-      if ('commit' in source.select) {
-        sources.push({
-          source: id,
+    const artifacts = [];
+    const resolutions = new Map<string, Promise<string>>();
+    for (const [id, artifact] of selectedArtifacts(manifest, options)) {
+      if (!artifact.track) {
+        artifacts.push({
+          artifact: id,
+          source: artifact.source,
           status: 'pinned',
-          commit: old.sources[id]!.commit,
+          commit: artifact.commit,
         });
         continue;
       }
-      const commit = await resolveSource(ctx, source);
-      let relevant = false;
-      for (const [key, artifact] of Object.entries(manifest.artifacts)) {
-        if (artifact.source === id) {
-          const next = await snapshot(ctx, artifact, source, commit);
-          relevant ||= next.locked.digest !== old.artifacts[key]!.digest;
-        }
-      }
-      sources.push({
-        source: id,
+      const source = manifest.sources[artifact.source]!;
+      const key = objectHash({ source, track: artifact.track });
+      if (!resolutions.has(key))
+        resolutions.set(key, resolveSource(ctx, source, artifact.track));
+      const commit = await resolutions.get(key)!;
+      const next =
+        commit === artifact.commit
+          ? null
+          : await snapshot(ctx, artifact, source, commit);
+      const relevant =
+        next !== null && next.locked.digest !== old.artifacts[id]!.digest;
+      artifacts.push({
+        artifact: id,
+        source: artifact.source,
         status:
-          commit === old.sources[id]!.commit
+          commit === artifact.commit
             ? 'current'
             : relevant
               ? 'update-available'
               : 'upstream-only',
-        commit: old.sources[id]!.commit,
+        commit: artifact.commit,
         candidate: commit,
         relevant,
       });
     }
-    return { sources };
+    return { artifacts };
   });
 }
 
 export async function init(ctx: Context): Promise<unknown> {
   return withWriter(ctx, async () => {
-    if (basename(ctx.manifestPath) === 'skills-depot.lock.json')
+    if (basename(ctx.manifestPath) === 'agent-depot.lock.json')
       throw new DepotError(
         'INVALID_MANIFEST',
         'Manifest cannot use the lockfile name',
@@ -540,7 +597,7 @@ export async function init(ctx: Context): Promise<unknown> {
     await replace(ctx, [
       {
         target: ctx.manifestPath,
-        content: json({ schemaVersion: 1, sources: {}, artifacts: {} }),
+        content: json({ schemaVersion: 2, sources: {}, artifacts: {} }),
       },
     ]);
     return { created: ctx.manifestPath };
@@ -562,19 +619,24 @@ export async function add(
       );
     const next = structuredClone(manifest);
     if (
-      Object.hasOwn(next.sources, id) &&
-      objectHash(next.sources[id]) !== objectHash(source)
+      Object.hasOwn(next.sources, (artifact as { source: string }).source) &&
+      objectHash(next.sources[(artifact as { source: string }).source]) !==
+        objectHash(source)
     )
       throw new DepotError(
         'SOURCE_CONFLICT',
-        `Source ID is already used: ${id}`,
+        `Source ID is already used: ${(artifact as { source: string }).source}`,
       );
-    Object.defineProperty(next.sources, id, {
-      value: source,
-      enumerable: true,
-      writable: true,
-      configurable: true,
-    });
+    Object.defineProperty(
+      next.sources,
+      (artifact as { source: string }).source,
+      {
+        value: source,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      },
+    );
     Object.defineProperty(next.artifacts, id, {
       value: artifact,
       enumerable: true,
@@ -647,13 +709,7 @@ export async function diffPatch(ctx: Context, file: string): Promise<unknown> {
       );
     await verifySnapshots(ctx, old);
     assertAligned(candidate.manifest, candidate.lock);
-    const next = await buildLock(
-      ctx,
-      candidate.manifest,
-      candidate.lock,
-      false,
-      {},
-    );
+    const next = await buildLock(ctx, candidate.manifest, old, {});
     if (objectHash(next.lock) !== objectHash(candidate.lock))
       throw new DepotError(
         'INVALID_PLAN',

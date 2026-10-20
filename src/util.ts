@@ -95,7 +95,7 @@ export function context(manifest: string): Context {
   return {
     root,
     manifestPath,
-    lockPath: join(root, 'skills-depot.lock.json'),
+    lockPath: join(root, 'agent-depot.lock.json'),
     state: join(root, '.agent-depot'),
   };
 }

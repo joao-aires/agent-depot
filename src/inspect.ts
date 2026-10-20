@@ -11,7 +11,7 @@ type Files = Map<string, { content: Buffer }>;
 const at = (root: string, path: string) =>
   root === '.' ? path : `${root}/${path}`;
 
-function skill(files: Files, path: string): string[] {
+function skill(files: Files, path: string, directory?: string): string[] {
   const content = files.get(path)?.content.toString('utf8') ?? '';
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(content);
   if (!match) return [`${path}: missing YAML frontmatter`];
@@ -33,7 +33,7 @@ function skill(files: Files, path: string): string[] {
       fields.description.length > 1024
     )
       errors.push(`${path}: invalid description`);
-    const directoryName = path.split('/').at(-2);
+    const directoryName = directory ?? path.split('/').at(-2);
     if (fields.name !== directoryName)
       errors.push(`${path}: name must match its directory`);
     for (const field of ['license', 'compatibility'])
@@ -64,7 +64,7 @@ async function schema(name: string, value: unknown): Promise<string[]> {
   let validate = validators.get(name);
   if (!validate) {
     const file = packageFile(
-      `vendor/agent-plugins/schemas/1.0.0/${name}.schema.json`,
+      `schemas/upstream/agent-plugins/1.0.0/${name}.schema.json`,
     );
     validate = new Ajv2020({
       allErrors: true,
@@ -94,9 +94,13 @@ export async function inspect(
     diagnostics: [],
   };
   if (artifact.kind === 'skill') {
-    const path = at(artifact.path, 'SKILL.md');
+    const path = 'SKILL.md';
     result.skills.push(path);
-    result.diagnostics = skill(files, path);
+    result.diagnostics = skill(
+      files,
+      path,
+      artifact.destination.split('/').at(-1),
+    );
     result.validation = result.diagnostics.length ? 'invalid' : 'valid';
     return result;
   }
@@ -108,7 +112,7 @@ export async function inspect(
   }
   result.format = 'unknown-plugin';
   result.validation = 'unsupported';
-  const manifest = files.get(at(artifact.path, 'plugin.json'));
+  const manifest = files.get(at('.', 'plugin.json'));
   if (!manifest) {
     result.diagnostics.push(
       'No root plugin.json; native or unknown plugin format preserved without validation',
@@ -136,7 +140,7 @@ export async function inspect(
   result.diagnostics.push(...(await schema('plugin', data)));
   if (data.extensions && typeof data.extensions === 'object')
     result.extensions = Object.keys(data.extensions).sort();
-  const prefix = at(artifact.path, 'skills/');
+  const prefix = at('.', 'skills/');
   for (const path of files.keys()) {
     if (
       path.startsWith(prefix) &&
@@ -146,9 +150,9 @@ export async function inspect(
       result.diagnostics.push(...skill(files, path));
     }
   }
-  if (files.has(at(artifact.path, 'skills')))
+  if (files.has(at('.', 'skills')))
     result.diagnostics.push('skills must be a directory');
-  const mcpPath = at(artifact.path, 'mcp.json');
+  const mcpPath = at('.', 'mcp.json');
   if ([...files.keys()].some((path) => path.startsWith(`${mcpPath}/`)))
     result.diagnostics.push('mcp.json must be a file');
   if (files.has(mcpPath)) {
@@ -170,7 +174,7 @@ export async function inspect(
             ) {
               try {
                 const path = safePath(server.command.slice(2));
-                if (!files.has(at(artifact.path, path)))
+                if (!files.has(at('.', path)))
                   result.diagnostics.push(
                     `MCP ${name}: bundled command is missing`,
                   );
@@ -187,7 +191,7 @@ export async function inspect(
               );
               if (cwd.startsWith('./') && cwd !== './') {
                 try {
-                  const path = at(artifact.path, safePath(cwd.slice(2)));
+                  const path = at('.', safePath(cwd.slice(2)));
                   if (
                     ![...files.keys()].some((file) =>
                       file.startsWith(`${path}/`),

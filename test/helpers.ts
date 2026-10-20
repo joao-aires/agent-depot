@@ -67,22 +67,26 @@ export function fixture(t: TestContext) {
   }
   const first = commit();
   const manifest: Manifest = {
-    schemaVersion: 1,
-    sources: { toolkit: { repository: upstream, select: { branch: 'main' } } },
+    schemaVersion: 2,
+    sources: { toolkit: { repository: upstream } },
     artifacts: {
       alpha: {
         source: 'toolkit',
+        commit: first,
+        track: { branch: 'main' },
         kind: 'skill',
         path: 'skills/alpha',
-        destination: 'vendor/toolkit',
-        additionalPaths: ['shared'],
-        legalPaths: ['LICENSE'],
+        destination: 'plugins/example/skills/alpha',
+        resources: [
+          { path: 'shared', destination: 'shared' },
+          { path: 'LICENSE', destination: 'UPSTREAM-LICENSE.txt' },
+        ],
         requireFormat: true,
       },
     },
   };
   function save(value: Manifest = manifest): void {
-    put('skills-depot.json', JSON.stringify(value, null, 2) + '\n', true);
+    put('agent-depot.json', JSON.stringify(value, null, 2) + '\n', true);
   }
   save();
   function cli(...args: string[]) {
@@ -106,7 +110,7 @@ export function fixture(t: TestContext) {
   function acquire(): Lock {
     ok('lock');
     ok('sync');
-    return read<Lock>('skills-depot.lock.json');
+    return read<Lock>('agent-depot.lock.json');
   }
   function prepare(): UpdatePlan {
     ok('plan', '--output', 'candidate.json');

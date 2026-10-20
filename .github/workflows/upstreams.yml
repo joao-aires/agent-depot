@@ -49,9 +49,9 @@ jobs:
           commit-message: 'chore(upstreams): update accepted Agent Plugins schemas'
           body-path: ${{ runner.temp }}/agent-depot-update.md
           add-paths: |
-            skills-depot.json
-            skills-depot.lock.json
-            vendor/agent-plugins/**
+            agent-depot.json
+            agent-depot.lock.json
+            schemas/upstream/agent-plugins/**
       - name: Preserve the discovery report
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

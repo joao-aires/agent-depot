@@ -37,30 +37,27 @@ test('complete plugins preserve opaque extensions and scripts without running th
   f.manifest.artifacts = {
     review: {
       source: 'toolkit',
+      commit: f.git('rev-parse', 'HEAD'),
       kind: 'plugin',
       path: 'plugins/review',
       destination: 'vendor/review',
-      legalPaths: ['LICENSE'],
+      resources: [{ path: 'LICENSE', destination: 'UPSTREAM-LICENSE.txt' }],
       requireFormat: true,
     },
   };
   f.save();
-  f.commit();
+  f.manifest.artifacts.review!.commit = f.commit();
+  f.save();
   const lock = f.acquire();
   const inspection = lock.artifacts.review!.inspection;
   assert.equal(inspection.validation, 'valid');
   assert.equal(inspection.format, 'agent-plugins@1.0.0');
-  assert.deepEqual(inspection.skills, [
-    'plugins/review/skills/review/SKILL.md',
-  ]);
+  assert.deepEqual(inspection.skills, ['skills/review/SKILL.md']);
   assert.deepEqual(inspection.mcpServers, ['service']);
   assert.deepEqual(inspection.extensions, ['org.example.client']);
   assert.equal(
     readFileSync(
-      join(
-        f.project,
-        'vendor/review/plugins/review/org.example.client/hooks/setup.sh',
-      ),
+      join(f.project, 'vendor/review/org.example.client/hooks/setup.sh'),
       'utf8',
     ),
     '#!/bin/sh\ntouch SHOULD_NOT_EXIST\n',
@@ -82,6 +79,7 @@ test('unknown plugin schemas are preservable, but explicit format policy rejects
   f.manifest.artifacts = {
     review: {
       source: 'toolkit',
+      commit: f.git('rev-parse', 'HEAD'),
       kind: 'plugin',
       path: 'plugins/review',
       destination: 'vendor/review',
@@ -108,6 +106,7 @@ test('native plugins are preserved without claiming portable validation; filteri
   f.manifest.artifacts = {
     review: {
       source: 'toolkit',
+      commit: f.git('rev-parse', 'HEAD'),
       kind: 'plugin',
       path: 'plugins/review',
       destination: 'vendor/review',
@@ -145,6 +144,7 @@ test('MCP configuration violations are visible without attempting a connection',
   f.manifest.artifacts = {
     review: {
       source: 'toolkit',
+      commit: f.git('rev-parse', 'HEAD'),
       kind: 'plugin',
       path: 'plugins/review',
       destination: 'vendor/review',
