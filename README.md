@@ -82,6 +82,8 @@ Applying checks that the starting files still match, then replaces changed snaps
 
 For an artifact without tracking, select a known candidate with `plan --artifact <id> --to <full-commit> --output <new-plan-file>`, replacing those placeholders. For adding, removing or relocating dependencies in an established repository, use the same plan/review/update flow after editing declarations. Initial `lock`/`sync` is not a shortcut around updating accepted snapshots.
 
+Optional artifact `metadata` keeps consumer annotations beside each dependency. Agent Depot preserves arbitrary keys, reports annotation changes in plans and reuses verified snapshots for metadata-only updates without fetching or rewriting their files. Consumers own the meaning and validation of those annotations; see [consumer metadata](documentation/configuration.md#consumer-metadata).
+
 ## Skills, plugins and resources
 
 Use `--kind skill` for a selected skill root or `--kind plugin` for a complete plugin. For example, upstream `skills/design` can map directly to `plugins/frontend/skills/design`, placing `SKILL.md` and its internal resources in that folder. Additional required files outside the root use explicit `--resource source=destination` mappings within the owned destination. Mappings never rewrite upstream links; preserve a larger group or apply consumer-owned packaging adaptations when references require it.

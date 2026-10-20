@@ -27,6 +27,7 @@ import {
 } from './transaction.js';
 import type { Replacement } from './transaction.js';
 import type {
+  Artifact,
   ArtifactChange,
   Context,
   Lock,
@@ -201,6 +202,12 @@ function declaration(artifact: LockedArtifact) {
   return value;
 }
 
+// Consumer annotations are part of declaration review, not acquisition identity.
+function acquisition(artifact: Artifact) {
+  const { metadata: _metadata, ...value } = artifact;
+  return value;
+}
+
 async function buildLock(
   ctx: Context,
   manifest: Manifest,
@@ -225,7 +232,8 @@ async function buildLock(
     if (
       old &&
       source.repository === previous?.sources[old.source]?.repository &&
-      objectHash(declaration(old)) === objectHash(artifact) &&
+      objectHash(acquisition(declaration(old))) ===
+        objectHash(acquisition(artifact)) &&
       (await exists(join(ctx.root, artifact.destination)))
     ) {
       const destination = join(ctx.root, artifact.destination);
@@ -367,6 +375,15 @@ function changes(old: Lock, next: Lock): ArtifactChange[] {
         changed,
         oldCommit,
         newCommit,
+        ...(objectHash(before?.metadata ?? null) !==
+        objectHash(after?.metadata ?? null)
+          ? {
+              metadataChange: {
+                before: before?.metadata ?? null,
+                after: after?.metadata ?? null,
+              },
+            }
+          : {}),
       });
   }
   return result;
@@ -498,7 +515,11 @@ export async function applyPlan(ctx: Context, file: string): Promise<unknown> {
         });
     }
     for (const [id, artifact] of Object.entries(candidate.lock.artifacts)) {
-      if (objectHash(old.artifacts[id] ?? null) !== objectHash(artifact))
+      const before = old.artifacts[id];
+      if (
+        before?.destination !== artifact.destination ||
+        objectHash(before?.files ?? null) !== objectHash(artifact.files)
+      )
         replacements.push({
           target: join(ctx.root, artifact.destination),
           directory: result.snapshots.get(id)!.files,

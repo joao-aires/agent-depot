@@ -198,6 +198,9 @@
               "diagnostics"
             ],
             "additionalProperties": false
+          },
+          "metadata": {
+            "type": "object"
           }
         },
         "required": [

@@ -67,13 +67,13 @@ A failed lookup, unmatched version policy or missing required selection fails di
 
 `plan --output <file>` checks current snapshots and prepares exact candidates. It supports the same mutually exclusive artifact/source filters. Filters limit tracking discovery; existing declaration edits still appear in the plan. New or edited declarations retain their stated commits during that plan, while unchanged declarations can follow their tracking policies.
 
-For a chosen artifact, `plan --artifact <id> --to <full-commit> --output <new-file>` proposes that exact commit and retains its optional tracking policy. Neither unrelated tracking policies nor a moving branch change the requested candidate. Verified unchanged snapshots can be reused without contacting their upstreams.
+For a chosen artifact, `plan --artifact <id> --to <full-commit> --output <new-file>` proposes that exact commit and retains its optional tracking policy. Neither unrelated tracking policies nor a moving branch change the requested candidate. Verified unchanged snapshots, including snapshots with metadata-only edits, can be reused without contacting their upstreams. Metadata-only updates do not rewrite those snapshot directories.
 
-Plans contain starting manifest/lock hashes, exact proposed declarations, file identities, inspection and file changes. Keep them in a trusted review location outside managed snapshots and choose a new filename each time. They are review records, not signed authorization tokens.
+Plans contain starting manifest/lock hashes, exact proposed declarations, file identities, inspection, file changes and optional artifact `metadataChange` records. Keep them in a trusted review location outside managed snapshots and choose a new filename each time. They are review records, not signed authorization tokens.
 
 ## Review and apply
 
-`diff <plan-file>` summarizes file additions, removals, byte/mode changes and recorded inspection. `--patch` also compares actual accepted and exact candidate content, checking the starting state and disabling external Git diff/textconv execution. Git summarizes binary changes; a readable text patch is not available for every file.
+`diff <plan-file>` summarizes file additions, removals, byte/mode changes and recorded inspection, plus artifact metadata before/after values when annotations change. `--patch` also compares actual accepted and exact candidate content, checking the starting state and disabling external Git diff/textconv execution. Git summarizes binary changes; a readable text patch is not available for every file.
 
 Review instructions, required resources, licenses and format changes before `update --plan <file>`. If your consumer applies packaging adaptations, compare its effective output too. Applying rechecks the plan's starting manifest, lock and snapshots, verifies exact candidate content, then changes the accepted generation through a recoverable transaction. A changed baseline requires a new plan; a later upstream commit does not replace the planned candidate.
 

@@ -23,5 +23,6 @@ The first useful journey is to declare a source and an artifact with its accepte
 6. Interrupted writes are detectable and recoverable. Recovery restores the previous generation when replacement was not committed, retains a completed committed generation, and refuses to silently discard later edits.
 7. Read commands have documented mutation/network behavior. CI receives structured results and nonzero failure statuses.
 8. A packed npm artifact runs outside the source checkout. No acquired script runs during resolution, inspection, sync or update.
+9. Artifact metadata remains consumer-defined and reviewable. A metadata-only update to a present, verified snapshot succeeds without an upstream or Git cache, preserves its accepted commit and file identities, and does not rewrite its directory. Consumers remain responsible for validating and testing their use of that metadata.
 
 The CLI does not establish demand, behavioral quality or licensing suitability automatically. It preserves the evidence needed to review these decisions. Runtime dependencies fetched by acquired code and remote MCP services are not frozen by a snapshot.

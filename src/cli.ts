@@ -152,7 +152,7 @@ program
 program
   .command('diff <plan-file>')
   .description(
-    'Read the file-level changes and format inspection in a prepared plan',
+    'Read file/metadata changes and format inspection in a prepared plan',
   )
   .option(
     '--patch',
@@ -170,7 +170,7 @@ program
             artifact.inspection,
           ]),
         ),
-        note: 'File identities and executable flags are compared. Runtime compatibility is not tested.',
+        note: 'File identities, executable flags and artifact metadata are compared. Runtime compatibility is not tested.',
       };
     }),
   );

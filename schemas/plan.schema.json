@@ -143,6 +143,9 @@
                   "additionalProperties": false
                 },
                 "uniqueItems": true
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": ["source", "commit", "kind", "path", "destination"],
@@ -356,6 +359,9 @@
                   "diagnostics"
                 ],
                 "additionalProperties": false
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
@@ -411,6 +417,19 @@
           "newCommit": {
             "type": "string",
             "pattern": "^[a-f0-9]{40}$"
+          },
+          "metadataChange": {
+            "type": "object",
+            "properties": {
+              "before": {
+                "type": ["object", "null"]
+              },
+              "after": {
+                "type": ["object", "null"]
+              }
+            },
+            "required": ["before", "after"],
+            "additionalProperties": false
           }
         },
         "required": [
