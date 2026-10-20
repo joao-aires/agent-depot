@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.test-dist/
+coverage/
+package-lock.json
+schemas/upstream/
+vendor/
+LICENSE

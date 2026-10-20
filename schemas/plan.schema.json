@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "baseManifestHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "baseLockHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "sources": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "select": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commit": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{40}$"
+                      }
+                    },
+                    "required": ["commit"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["branch"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "tag": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["tag"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "tagPrefix": {
+                        "type": "string"
+                      },
+                      "prerelease": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["version"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": ["repository", "select"],
+            "additionalProperties": false
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": ["skill", "plugin", "directory"]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "includePaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "legalPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "requireFormat": {
+                "type": "boolean"
+              }
+            },
+            "required": ["source", "kind", "path", "destination"],
+            "additionalProperties": false
+          }
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": ["schemaVersion", "sources", "artifacts"],
+      "additionalProperties": false
+    },
+    "lock": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "manifestHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sources": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "select": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commit": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{40}$"
+                      }
+                    },
+                    "required": ["commit"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["branch"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "tag": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["tag"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "tagPrefix": {
+                        "type": "string"
+                      },
+                      "prerelease": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["version"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            },
+            "required": ["repository", "select", "commit"],
+            "additionalProperties": false
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": ["skill", "plugin", "directory"]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "includePaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "legalPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "requireFormat": {
+                "type": "boolean"
+              },
+              "files": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "mode": {
+                      "enum": ["100644", "100755"]
+                    }
+                  },
+                  "required": ["sha256", "mode"],
+                  "additionalProperties": false
+                }
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "inspection": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "validation": {
+                    "enum": ["valid", "invalid", "unsupported", "not-requested"]
+                  },
+                  "skills": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "mcpServers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "diagnostics": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "format",
+                  "validation",
+                  "skills",
+                  "mcpServers",
+                  "extensions",
+                  "diagnostics"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "source",
+              "kind",
+              "path",
+              "destination",
+              "files",
+              "digest",
+              "inspection"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["schemaVersion", "manifestHash", "sources", "artifacts"],
+      "additionalProperties": false
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "oldCommit": {
+            "type": ["string", "null"]
+          },
+          "newCommit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          }
+        },
+        "required": [
+          "artifact",
+          "added",
+          "removed",
+          "changed",
+          "oldCommit",
+          "newCommit"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "baseManifestHash",
+    "baseLockHash",
+    "manifest",
+    "lock",
+    "changes"
+  ],
+  "additionalProperties": false
+}

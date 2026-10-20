@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "agent-plugins-spec": {
+      "repository": "https://github.com/agentplugins/agent-plugins-spec.git",
+      "select": { "branch": "main" }
+    }
+  },
+  "artifacts": {
+    "agent-plugins-schemas": {
+      "source": "agent-plugins-spec",
+      "kind": "directory",
+      "path": "schemas/1.0.0",
+      "destination": "vendor/agent-plugins",
+      "legalPaths": ["LICENSE.md", "LICENSES/Apache-2.0.txt"]
+    }
+  }
+}

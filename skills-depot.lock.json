@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "manifestHash": "fca09ddea3f8907fbe9b3d02dff36225411f93b972ee796a0983fbb64fbdbd13",
+  "sources": {
+    "agent-plugins-spec": {
+      "repository": "https://github.com/agentplugins/agent-plugins-spec.git",
+      "select": {
+        "branch": "main"
+      },
+      "commit": "ff8ab5e392cc87bd88d87c060815a87490e51003"
+    }
+  },
+  "artifacts": {
+    "agent-plugins-schemas": {
+      "source": "agent-plugins-spec",
+      "kind": "directory",
+      "path": "schemas/1.0.0",
+      "destination": "vendor/agent-plugins",
+      "legalPaths": ["LICENSE.md", "LICENSES/Apache-2.0.txt"],
+      "files": {
+        "LICENSE.md": {
+          "sha256": "c614e83c1e0d6b1a53feb0d279fbfcfc2cc048ba34c19b751315d7dbb481c7a5",
+          "mode": "100644"
+        },
+        "LICENSES/Apache-2.0.txt": {
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "mode": "100644"
+        },
+        "schemas/1.0.0/mcp.schema.json": {
+          "sha256": "6539175bfcdf43085855183e86da40ea94b166547a72b47ae9a0a390516d3acb",
+          "mode": "100644"
+        },
+        "schemas/1.0.0/plugin.schema.json": {
+          "sha256": "0a4aad95ce337878ad38802ebf0daa3fde76abe3f65400c86bcbb1ec0b3ab883",
+          "mode": "100644"
+        }
+      },
+      "digest": "fbf14ac15ab67c5d1b444ee457b4b0d076c3f3486ab4f3983ed70795a82d124f",
+      "inspection": {
+        "format": "directory",
+        "validation": "not-requested",
+        "skills": [],
+        "mcpServers": [],
+        "extensions": [],
+        "diagnostics": []
+      }
+    }
+  }
+}

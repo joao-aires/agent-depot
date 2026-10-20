@@ -1,0 +1,63 @@
+name: Review upstream snapshots
+
+on:
+  schedule:
+    - cron: '23 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-snapshots
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Discover and prepare an exact update
+        id: candidate
+        run: node scripts/prepare-update.mjs
+      - name: Validate candidate packages and committed snapshots
+        if: steps.candidate.outputs.changed == 'true'
+        run: |
+          npm run check
+          node dist/cli.js --json verify
+      - name: Open or refresh the upstream review PR
+        if: steps.candidate.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: automation/agent-plugins-schemas
+          base: main
+          title: 'chore(upstreams): update accepted Agent Plugins schemas'
+          commit-message: 'chore(upstreams): update accepted Agent Plugins schemas'
+          body-path: ${{ runner.temp }}/agent-depot-update.md
+          add-paths: |
+            skills-depot.json
+            skills-depot.lock.json
+            vendor/agent-plugins/**
+      - name: Preserve the discovery report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: upstream-review
+          path: |
+            ${{ runner.temp }}/agent-depot-discovery.json
+            ${{ runner.temp }}/agent-depot-plan.json
+          if-no-files-found: ignore

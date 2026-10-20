@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+# Agent Depot build, package and maintenance state
+.test-dist/
+.agent-depot/
+*.tgz
