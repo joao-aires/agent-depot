@@ -1,35 +1,100 @@
 # Architecture
 
-The CLI is a local dependency maintenance process with Git as its source transport. It has no daemon, registry, database, client profile access or required AI service.
+Agent Depot is one local Node.js CLI process, invoked by a maintainer or CI job. It uses Git subprocesses to read upstream repositories and the filesystem to maintain a consumer checkout. This describes the implemented system; there is no hosted service, registry, database or required AI runtime.
 
-## Ownership and durable records
+The design serves the [product acceptance criteria](product.md#observable-acceptance): keep accepted dependencies available, make upgrades reviewable and preserve local work when a change cannot complete.
 
-`agent-depot.json` declares sources and artifacts. `agent-depot.lock.json` records accepted resolution and content identity. Both paths are relative to the manifest directory, which is the project root even when the command is called elsewhere. Repository-specific packaging metadata may live under the manifest's `metadata` field; the core does not interpret it.
+## System boundary and responsibilities
 
-Sources describe repository identity once. Artifacts independently declare accepted commits and optional tracking policies. Shared repositories reuse the same Git cache; this does not couple artifact revisions or update policies.
+The caller chooses the consumer manifest, requested operation and any candidate commit. The manifest's directory defines the consumer root. Upstreams may be remote Git repositories or explicitly declared local paths. All acquired files and declarations are untrusted input; the CLI validates them before they can become replacement targets.
 
-Each artifact owns a separate destination directory. The contents of upstream `path: "skills/design"` materialize directly at destination `plugins/frontend/skills/design`, including its `SKILL.md` and internal resource hierarchy. Explicit `resources` mappings place selected external files or directories within that owned destination, rejecting duplicate targets and file/directory or case collisions. Complete plugin snapshots cannot filter their primary package contents. A directory group may use `includePaths` for an intentional subset.
+The CLI runs with the caller's filesystem authority. A writer marker coordinates Agent Depot operations in that root; it is not a lock against an editor or another filesystem writer. Consumer packaging happens after acquisition and can apply its own transformations. Agent Depot does not discover agent settings, launch acquired scripts or configure remote services.
 
-The lockfile includes per-file SHA-256 and executable mode as well as an aggregate digest. It records only metadata needed to reproduce or verify content; timestamps are excluded. Source commit IDs provide provenance, not a claim of authenticity. Local hashes establish agreement with the reviewed lockfile, not trustworthiness.
+| Building block          | Responsibility and relationship                                                                                | Source                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| CLI and orchestration   | Interpret the command, select artifacts and coordinate verification, plans and application                     | [CLI](../src/cli.ts), [lifecycle operations](../src/depot.ts)                 |
+| Configuration           | Validate manifest, lock and plan schemas; check declarations, paths and alignment                              | [Configuration](../src/config.ts), [schemas](../schemas/manifest.schema.json) |
+| Git transport           | Resolve tracking policies and read exact committed objects through bounded Git subprocesses                    | [Git acquisition](../src/git.ts)                                              |
+| Snapshot and inspection | Map selected roots/resources to owned destinations; hash bytes/modes and report supported-format checks        | [Selection](../src/snapshot.ts), [inspection](../src/inspect.ts)              |
+| Transactions            | Stage proposed files, journal before/after identities, replace targets with backups and reconcile interruption | [Replacement and recovery](../src/transaction.ts)                             |
 
-## Modules and operations
+These are modules inside the same process. The Git subprocess is the network boundary; it reads objects without checking out upstream worktrees or running their filters. Format inspection reads preserved content and bundled schemas, not acquired executables. The supported Agent Plugins profile is 1.0.0; unknown formats remain preservable unless strict validation is requested.
 
-Configuration validation establishes typed input from unknown JSON. Git acquisition resolves references and reads committed objects without checking out or executing upstream filters. Snapshot selection preserves paths within each selected root and records explicit external mappings; inventory adds skill and plugin diagnostics. Planning binds exact candidates and the accepted generation. Unchanged accepted snapshots are reused after integrity checks, so a targeted update does not require unrelated upstreams to be reachable. The transaction layer owns local replacement and recovery. The CLI presents these operations as text or versioned JSON.
+## Records, ownership and lifetime
 
-The main sequence is `declaration → lock → sync → verify`. Updates use `outdated → plan → diff → update --plan`. Locking acquires the artifact commits already declared; it does not discover newer revisions. Update discovery follows optional per-artifact tracking policies and may fetch candidates; inspection of accepted snapshots and verification are offline. Missing content can be restored from locked Git objects when upstream access or cache is available. Committed snapshots remain usable if those objects become unavailable.
+A source describes repository identity once. Each artifact independently declares its accepted commit, selected root, destination and optional tracking policy. Sharing a repository allows reuse of the Git cache while retaining separate accepted revisions and update choices.
 
-## Failure and authority boundaries
+| Record                                        | Owner and lifetime                                                        | What it establishes                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `agent-depot.json`                            | Human-maintained and committed with the consumer                          | Repository identities, artifact pins, placement and optional consumer metadata   |
+| `agent-depot.lock.json`                       | Generated and committed with snapshots                                    | Accepted declarations, file hashes/modes, aggregate digests and inspection       |
+| Artifact destination directories              | Committed consumer files managed as separate, non-overlapping roots       | The accepted upstream material, directly available in a checkout                 |
+| Update plan                                   | Caller-selected review file, retained until reviewed/applied or discarded | Exact proposed declarations/content identities and starting manifest/lock hashes |
+| `.agent-depot/cache/`                         | Local, replaceable Git object cache                                       | Faster acquisition and offline restoration when locked objects remain cached     |
+| `.agent-depot/writer.json` and `transaction/` | Local coordination and recovery state                                     | Which writer owns an operation and how interrupted replacement can be reconciled |
 
-Destinations must be non-overlapping repository-relative directories. The manager rejects symlinks and special entries in acquired trees in this release rather than pretending to preserve unsupported filesystem behavior. It refuses Git submodules and LFS pointers instead of claiming their referenced data was captured. Git commands use argv without a shell and have bounded output/time. Local path sources are for explicitly selected repositories and fixtures.
+Paths inside a selected root remain intact under its destination. Explicit resource mappings can place external licenses or shared directories within that owned root. The [configuration reference](configuration.md#placement-and-resource-ownership) defines mappings, filtering and collisions. Required file identities are in the lock; source paths plus mappings explain where those files came from.
 
-Writes are staged under `.agent-depot/`. A journal and backups permit rollback across several file replacements; this is recoverable multi-file replacement, not a claim that the filesystem provides an atomic multi-directory commit. An exclusive writer marker prevents competing mutations. Mutations refuse an unfinished transaction until `recover` reconciles it. Recovery checks that current files still match a recorded before/after state before restoring backups.
+Each artifact owns its complete destination. Local edits and extra files cause drift, rather than becoming implicitly accepted content. Consumer-specific adaptations belong in a separate packaging step; arbitrary root `metadata` is retained without being interpreted by the acquisition engine. A missing cache does not affect verification of present snapshots, but losing both the source and cache prevents restoration of a missing snapshot.
 
-Agent Plugins inspection uses bundled, attributed 1.0.0 schemas and additional path/structure checks. Extensions are preserved as opaque content. Unknown schema versions are reported as unsupported and remain preservable; explicit strict-format policy can reject them. The tool is a package maintainer, not an Agent Plugins runtime client.
+## From accepted commit to committed snapshot
 
-## Alternatives and evolution
+Initial acquisition follows `declaration → lock → sync → verify`. Locking reads the declared commits and records selected file identities. Sync restores missing snapshot directories at those accepted revisions, after checking existing managed directories for drift. Verification compares declarations and local files without network access or repairs.
 
-Client installers solve placement and activation in client environments; this tool owns reviewed source material in repositories. Vendir provides a useful model for source selection and legal-file preservation. A direct Git object implementation avoids requiring a second executable/package configuration and reuses the collection's proven acquisition approach, while tests protect the contracts rather than mirroring the implementation.
+For an established repository, declaration edits use a plan and update so the lock and files stay consistent. `lock` refuses to change the accepted lock while previously materialized snapshots exist. The [command reference](commands.md) explains each operation's write and network behavior.
 
-Future artifact formats can add inspection profiles without changing snapshot identity or activating components. Native adapters, registries and runtime dependency graphs require separate demonstrated needs. Agent Plugins schema upgrades are explicit additions; the standard's version, a plugin's version and Agent Depot's version remain independent.
+## How an update reaches the commit boundary
 
-Primary references: [Agent Plugins specification](https://agent-plugins.org/specification), [Agent Skills specification](https://agentskills.io/specification), [Cargo vendoring](https://doc.rust-lang.org/cargo/commands/cargo-vendor.html), [Vendir](https://carvel.dev/vendir/docs/v0.46.x/vendir-spec/).
+This sequence shows an implemented CLI update in one consumer checkout. Arrows to Git may use cached objects; they do not imply a network request on every operation. The caller reviews the plan between the two invocations.
+
+```mermaid
+sequenceDiagram
+    actor Maintainer
+    participant CLI as Agent Depot process
+    participant Git as Git subprocess
+    participant Files as Consumer filesystem
+    Maintainer->>CLI: Prepare an artifact update plan
+    CLI->>Files: Verify accepted snapshots
+    CLI->>Git: Resolve tracking or read explicit candidate
+    Git-->>CLI: Exact commit and selected files
+    CLI-->>Maintainer: Plan with candidate and starting hashes
+    Note over CLI,Files: Planning leaves accepted files unchanged
+    Maintainer->>CLI: Apply reviewed plan
+    CLI->>Files: Check starting hashes and snapshot integrity
+    CLI->>Git: Read exact planned objects when needed
+    CLI->>Files: Stage replacements and persist journal
+    CLI->>Files: Replace targets while retaining backups
+    CLI->>Files: Write committed marker and clean up
+    CLI-->>Maintainer: Report applied changes
+```
+
+[Planning](../src/depot.ts) verifies the existing snapshot generation, reads the requested candidate and creates a proposed manifest/lock. Tracking only applies to unchanged declarations selected for discovery. Explicit declaration edits retain their specified commits, and `--to` selects one artifact's exact candidate. An unrelated upstream commit that changes none of the selected bytes/modes does not advance a tracked artifact's accepted pin.
+
+[Application](../src/depot.ts) first checks the plan's starting manifest and lock hashes, then verifies the current snapshots. It reacquires the exact proposed content where needed and checks the proposed lock against that content and inspection. Verified unchanged snapshots can be reused without reaching their upstreams. New destinations are checked before any replacement; occupied targets and ownership overlaps fail.
+
+The [transaction layer](../src/transaction.ts) stages the changed roots and control files, records their before/after identities, and persists the journal before replacing a target. It then moves old targets into backups and installs replacements. Only after all replacements succeed does it write a committed marker. It moves the completed transaction out of the recovery path before deleting backups, so interrupted cleanup cannot look like an uncommitted partial generation.
+
+This is recoverable multi-target replacement, not a filesystem-wide atomic commit. Another process could observe intermediate replacements. Readers should not consume the checkout concurrently with an update; review a completed generation or a separate checkout instead.
+
+## Failure, retry and recovery
+
+| Failure boundary                                    | Accepted/recovery state                                                 | Next operation                                                                             |
+| --------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Candidate lookup, selection or inspection fails     | No accepted replacement has started                                     | Correct access/declaration issues and prepare a new plan                                   |
+| Plan base or current snapshot no longer matches     | Application refuses the candidate                                       | Preserve local work; reconcile the baseline and replan                                     |
+| Replacement fails before the committed marker       | The CLI attempts rollback; an incomplete rollback leaves recovery state | Stop the earlier writer and run `recover`                                                  |
+| All replacements finish, but cleanup is interrupted | The committed marker identifies the completed generation                | `recover` verifies and retains the new generation, then finishes cleanup                   |
+| Files or backups change after interruption          | Recorded identities cannot safely determine what to restore             | `RECOVERY_CONFLICT`; preserve current files, backups and journal for manual reconciliation |
+
+Recovery validates every journal target before modifying any target. An uncommitted generation is restored from available backups in reverse order; a committed generation is retained only if it still matches its recorded state. The writer marker can be reclaimed automatically only for a demonstrably dead process on the same host.
+
+A lost success response does not prove the old generation is still present: replacement may already have committed. Verify and inspect the resulting manifest/lock before retrying. Reapplying a plan after it changed those base records fails as stale. These mechanics are exercised with disposable Git repositories and simulated interrupted journals; they do not establish power-loss durability or protection against malicious edits to the control records. See the [recovery procedure](delivery.md#recover-an-interrupted-operation) for operator steps.
+
+## Accepted decisions
+
+| Decision                                                                                                               | Status   | Consequence                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| [Commit acquired snapshots in the consumer repository](decisions/0001-committed-snapshots.md)                          | Accepted | Checkouts retain content at the cost of repository size and reviewed update diffs                           |
+| [Separate repository identity, artifact pins and consumer policy](decisions/0002-artifact-pins-and-consumer-policy.md) | Accepted | Independent artifact revisions and placement without coding-agent installation or embedded adaptation rules |
+
+These records explain consequential choices and alternatives. Schemas remain the authoritative field contracts; operational procedures remain in [delivery](delivery.md).

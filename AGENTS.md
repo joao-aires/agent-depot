@@ -6,6 +6,7 @@ Agent Depot maintains upstream skills and plugins as committed repository depend
 
 - TypeScript ESM, compiled for Node.js 22.12 or newer; Git is a runtime prerequisite. Install development dependencies with `npm ci`.
 - Run `npm run check` before publishing a change. It includes type checking, lint/format checks, integration tests, a build and a packed-package smoke test.
+- Update affected documentation alongside implementation changes and accepted decisions. Check examples, source links, lifecycle/failure explanations and evidence limits when their contracts change.
 - Keep product contracts in `documentation/product.md`, implementation boundaries in `documentation/architecture.md`, and user-facing commands in the README and command reference.
 - Preserve upstream bytes and paths within selected roots. Repository sources own identity; artifacts own accepted commits and optional tracking. Resolve tracking only in explicit discovery/planning operations. Verification must neither fetch nor repair.
 - Treat manifests, lockfiles, plans and upstream files as untrusted runtime input. Validate them, enforce path ownership, protect local edits and never execute upstream hooks or scripts.

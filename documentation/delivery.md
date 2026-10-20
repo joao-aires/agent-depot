@@ -22,8 +22,45 @@ Before the first release, establish ownership of the npm package name and comple
 
 Prepare releases with an explicit version change, a changelog entry and compatibility notes for command or persisted-format changes. Merge reviewed code, obtain passing CI for its revision, then dispatch publication under the repository's release authority. After publication, verify the registry's version/integrity and exercise the exact version through `npx` in a disposable consumer. Record that evidence in the release, not as an unsupported statement in this document.
 
-## Recovery
+## Recover an interrupted operation
 
-For a faulty CLI release, keep the previous version available and pin consumers to it while preparing a new corrective version. Deprecate a faulty npm version only under explicit release authority; do not overwrite it. A code rollback does not automatically migrate a newer manifest/lockfile format, so format changes need an explicit compatibility or migration plan.
+Use this procedure after `RECOVERY_REQUIRED`, or when an operation stopped and left a writer/transaction marker. A command failure alone does not prove replacement was rolled back; the new generation may already have committed before the response or cleanup failed.
 
-For an upstream snapshot update, revert its manifest/lock/snapshot changes together and run verification and consumer packaging checks. For an interrupted local write, preserve transaction state and use `recover` after the original writer has stopped. Local transaction recovery protects against interrupted replacement; repository backups and Git history remain necessary for broader data loss.
+1. Stop using that consumer checkout for updates and identify the earlier process. Inspect `.agent-depot/writer.json` if present: it records a host and process ID. Let a live operation finish, or stop it through its owning session before recovery. A marker from another host cannot be assumed abandoned.
+2. Preserve current files and `.agent-depot/transaction/`, including its journal, staged content and backups. Use Git status/diff and an external copy of important uncommitted files to understand what exists. Do not erase local state or edit lock hashes to bypass the failure. `status` and `verify` themselves refuse an unfinished transaction; that is expected until recovery completes.
+3. From the consumer root, with the same compiled executable used for the operation, run:
+
+   ```sh
+   node "$depot_cli" recover
+   node "$depot_cli" verify
+   git status --short
+   git diff
+   ```
+
+4. Check which accepted generation remains before preparing another update. With an uncommitted journal, recovery restores the previous generation when the recorded files/backups still match. With a committed marker, it retains the new generation and finishes cleanup. Neither outcome implies that the files are already committed to Git.
+
+The `depot_cli` variable is the absolute executable path established in the [source walkthrough](../README.md#build-the-cli-from-source). If the manifest is elsewhere, supply its explicit `--manifest` path to both commands. Run verification only after `recover` succeeds.
+
+| Recovery result     | Meaning                                                                 | Next action                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `recovered: true`   | Recorded recovery/cleanup completed                                     | Verify snapshots, inspect Git changes and run consumer checks                                                         |
+| `recovered: false`  | No unfinished transaction was found                                     | Verify actual state; inspect a remaining writer marker if other commands still report busy                            |
+| `BUSY`              | A writer is live, belongs to another host or cannot safely be reclaimed | Establish its ownership; do not delete a marker merely to force a retry                                               |
+| `RECOVERY_CONFLICT` | Current files/backups no longer match recorded before/after identities  | Preserve all generations and manually reconcile the reported target before retrying recovery                          |
+| `INVALID_JOURNAL`   | Recovery records cannot be interpreted safely                           | Preserve records/backups and investigate with the matching CLI revision; do not invent replacement journal identities |
+
+`recover` reclaims a writer marker automatically only when its same-host process is demonstrably dead. It validates all journal targets before restoring any target. If post-interruption edits cause a conflict, save them outside managed roots and compare them with repository history and available backups. Only restore a recorded generation after you know which changes must be retained; the tool cannot decide how to merge those edits for you.
+
+If a recorded generation is no longer available, use Git history or another preserved copy to reconstruct a coherent manifest, lock and snapshot set in a separate checkout. Keep the conflicted checkout available until that recovery is verified. For a consumer with deliberate unaccepted declaration edits, snapshot recovery alone does not accept them: preserve the edits and reconcile them through the normal plan/update flow.
+
+These procedures cover interrupted local replacement with intact recovery records. They do not guarantee recovery from disk loss or maliciously rewritten records. Repository backups and version history remain necessary.
+
+## Revert an accepted dependency update
+
+Revert the accepted manifest, lock and snapshot changes together using the consumer's normal contribution workflow. Verify file integrity and rebuild/test any consumer adaptations before accepting that revert. Do not restore just a lockfile over different snapshot bytes. Once the baseline is coherent, prepare a new plan for any further update.
+
+## Recover from a faulty CLI release
+
+Pin consumers to the previous compatible CLI version while preparing a corrective release. A code rollback does not migrate a newer manifest/lock format; inspect the [configuration compatibility notes](configuration.md#lockfile-plans-and-compatibility) before choosing a version.
+
+Keep published versions immutable. Deprecating a faulty npm version requires the repository's release authority. Record the corrective version and verified consumer behavior in its release evidence; repository publication and deployment remain separate from local transaction recovery.
