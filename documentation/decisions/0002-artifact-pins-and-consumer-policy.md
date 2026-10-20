@@ -10,7 +10,7 @@ One upstream repository can supply several skills that need different accepted r
 
 Declare repositories once under `sources`. Require each artifact to state its accepted full commit, selected path and destination. Optional artifact tracking identifies candidate discovery policy; it never substitutes for the accepted pin. Place selected root contents directly at the destination, with explicit mappings for required external resources.
 
-Keep acquisition generic. Consumers own adaptations and distribution; Agent Depot preserves optional consumer metadata without interpreting it. Agent installation, activation and account configuration remain outside the tool.
+Keep acquisition generic. Consumers own adaptations and distribution; Agent Depot preserves optional consumer metadata without interpreting it. Artifact annotations live beside their pins and destinations; repository-wide annotations live at the manifest root. Metadata belongs to declaration review and stale-plan detection, but is excluded from acquisition comparison. This keeps consumer policy changes reviewable without requiring a remote fetch or rewriting verified snapshot files. Agent installation, activation and account configuration remain outside the tool.
 
 ## Alternatives considered
 

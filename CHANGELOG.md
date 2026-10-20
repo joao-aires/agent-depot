@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve consumer-defined artifact metadata in declarations and locks; report before/after annotations in plans. Metadata-only updates reuse verified snapshots without fetching or rewriting them. These optional format-2 fields require a compatible CLI revision.
+
 - Declare Git sources and maintain committed skill, plugin and directory snapshots through JSON manifests and lockfiles.
 - Require artifact commit pins with optional branch, tag and SemVer tracking; preserve selected-root paths, resources, legal files and executable flags.
 - Verify local integrity, inspect upstream changes, review unified patches and apply exact update plans.

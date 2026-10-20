@@ -18,6 +18,7 @@ export interface Artifact {
   resources?: { path: string; destination: string }[];
   includePaths?: string[];
   requireFormat?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Manifest {
@@ -76,6 +77,10 @@ export interface ArtifactChange {
   changed: string[];
   oldCommit: string | null;
   newCommit: string;
+  metadataChange?: {
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+  };
 }
 
 export interface Context {

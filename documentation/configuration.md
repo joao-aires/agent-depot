@@ -37,7 +37,30 @@ Every artifact requires `source`, a full 40-character `commit`, `kind`, `path` a
 
 Optional artifact `track` controls candidate discovery: `{ "branch": "main" }`, `{ "tag": "v1.2.0" }` or `{ "version": "^1.0.0", "tagPrefix": "v", "prerelease": false }`. It does not change `commit` during verification, locking, syncing or discovery. Planning proposes a new commit; applying the plan changes the manifest, lock and snapshots together. Without tracking, an artifact stays pinned until an explicit `plan --artifact <id> --to <commit>` or declaration edit.
 
-Optional root `metadata` belongs to the consumer repository. Agent Depot preserves it without interpreting application-specific packaging or adaptation rules.
+## Consumer metadata
+
+Both the manifest root and each artifact accept an optional `metadata` object. Its keys and nested JSON values belong to the consumer; Agent Depot does not prescribe a packaging schema, execute annotations or treat them as acquisition settings. Use artifact metadata for information about that dependency, and root metadata for repository-wide annotations.
+
+For example, a consumer that builds plugin bundles can keep its policy next to the artifact's commit and destination:
+
+```json
+{
+  "metadata": {
+    "packaging": {
+      "plugin": "frontend-development",
+      "license": "Apache-2.0",
+      "adaptations": ["usage-labels"],
+      "labels": { "scope": "generic", "role": "support" }
+    }
+  }
+}
+```
+
+Here `packaging`, its fields and their validation are consumer conventions. Agent Depot only requires `metadata` itself to be an object; arrays, scalars and null are rejected at that boundary. Consumers must validate the fields they read and test the resulting output.
+
+Edit annotations in the manifest, then use the normal `plan` → `diff` → `update` flow. Artifact metadata is copied into the accepted lock, and plans report its before/after values as `metadataChange`. The full manifest and lock hashes still include metadata, so changing it after planning makes that plan stale.
+
+When only metadata changes, planning and applying reuse verified existing snapshot files, keeping their commit, hashes, executable flags and directories unchanged. They need no Git cache or upstream access for that artifact. An unchanged tracked artifact selected in the same plan can still contact its upstream; select the annotated artifact with `--artifact <id>` to limit discovery. If its snapshot is missing or modified, restore or reconcile it before planning. Metadata edits do not implicitly advance tracking, while an explicit `--to` can combine annotation and content changes.
 
 ## Placement and resource ownership
 
@@ -67,6 +90,8 @@ Destinations cannot overlap, contain depot control files or use Git/state direct
 On Windows, verification checks bytes and paths without POSIX executable-bit comparison. Locked modes remain available for packaging and Unix checkouts. Consumer Git attributes can change checkout bytes; verification reports that drift rather than accepting it.
 
 Plans bind their starting manifest and lock to exact candidate declarations and file identities. Applying also checks current snapshots. Plugin schema versions and package release versions are independent of Agent Depot's persisted formats.
+
+Artifact metadata and the optional plan `metadataChange` field extend format 2. Existing format-2 records without them remain valid. Older CLI revisions reject the new fields: upgrade the pinned CLI before adding artifact metadata or reading plans that contain it. The lock still records metadata separately from the content digest; annotations change declaration identity, not snapshot file identity.
 
 ### Migrating the unreleased version 1 format
 

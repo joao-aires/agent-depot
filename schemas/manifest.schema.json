@@ -128,6 +128,9 @@
               "additionalProperties": false
             },
             "uniqueItems": true
+          },
+          "metadata": {
+            "type": "object"
           }
         },
         "required": ["source", "commit", "kind", "path", "destination"],
